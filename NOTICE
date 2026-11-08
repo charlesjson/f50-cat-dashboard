@@ -1,0 +1,7 @@
+The dashboard frontend is based on zashboard by Zephyruso and contributors,
+licensed under the MIT License. See LICENSE.
+Upstream: https://github.com/Zephyruso/zashboard
+Snapshot: bf4f00bb8d905f8a78f627af7cf84457c4db53c4
+
+F50 configuration management, the device service, and deployment tooling are
+additional work licensed under the MIT License, copyright 2026 contributors.

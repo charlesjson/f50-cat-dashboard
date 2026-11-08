@@ -1,0 +1,42 @@
+#!/system/bin/sh
+set -u
+manager_dir=/data/clash/Manager
+binary="$manager_dir/f50-manager"
+pidfile="$manager_dir/manager.pid"
+
+running() {
+    [ -f "$pidfile" ] || return 1
+    manager_pid=$(cat "$pidfile")
+    case "$manager_pid" in ''|*[!0-9]*) return 1 ;; esac
+    kill -0 "$manager_pid" 2>/dev/null || return 1
+    [ "$(readlink /proc/"$manager_pid"/exe)" = "$binary" ]
+}
+
+case "${1:-}" in
+    start)
+        if running; then echo 'F50 配置管理服务已运行'; exit 0; fi
+        umask 077
+        mkdir -p "$manager_dir"
+        nohup "$binary" >> "$manager_dir/manager.log" 2>&1 < /dev/null &
+        echo $! > "$pidfile"
+        sleep 1
+        if running; then echo 'F50 配置管理服务已启动'; else echo '管理服务启动失败，请检查 Manager/manager.log'; exit 1; fi
+        ;;
+    stop)
+        if running; then
+            kill "$manager_pid"
+            attempts=0
+            while kill -0 "$manager_pid" 2>/dev/null && [ "$attempts" -lt 12 ]; do
+                sleep 1
+                attempts=$((attempts + 1))
+            done
+            if kill -0 "$manager_pid" 2>/dev/null; then echo '管理服务仍在退出中'; exit 1; fi
+        fi
+        rm -f "$pidfile"
+        echo 'F50 配置管理服务已停止'
+        ;;
+    status)
+        if running; then echo 'running'; else echo 'stopped'; exit 1; fi
+        ;;
+    *) echo 'Usage: Manager.Service start|stop|status'; exit 1 ;;
+esac
