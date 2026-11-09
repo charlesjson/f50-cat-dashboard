@@ -20,7 +20,7 @@ jobs:
           cache-dependency-path: manager/go.sum
       - run: pnpm install --frozen-lockfile
       - run: pnpm type-check
-      - run: pnpm exec eslint src/assembly/f50.ts src/views/ConfigPage.vue
+      - run: pnpm exec eslint src/assembly/f50.ts src/views/ConfigPage.vue src/components/f50/GroupManager.vue
       - run: go test -race ./... && go vet ./...
         working-directory: manager
       - run: sh scripts/package-f50.sh

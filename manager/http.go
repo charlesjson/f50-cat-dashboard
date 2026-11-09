@@ -169,6 +169,7 @@ func (a *App) view() (Object, error) {
 		"version": version, "revision": a.state.Revision, "mode": a.state.Mode, "active": a.state.Active,
 		"sources": sources, "manual": nonNil(a.state.Manual), "chains": nonNil(a.state.Chains), "routes": nonNil(a.state.Routes),
 		"nodes": nonNil(nodes), "groups": groups, "disabled": nonNil(a.state.Disabled), "dns": dns,
+		"groupDetails": groupViews(a.state, cfg), "providerNames": providerNames(cfg),
 		"advanced": advanced, "resources": Object{"geox-url": objectOf(cfg["geox-url"]), "geo-auto-update": cfg["geo-auto-update"] == true, "geo-update-interval": cfg["geo-update-interval"]},
 		"drift": a.drift(), "ruleCount": len(stringsOf(cfg["rules"])), "transport": "TProxy",
 	}, nil

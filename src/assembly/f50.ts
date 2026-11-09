@@ -42,6 +42,21 @@ export type NodeEntry = {
   available: boolean
 }
 
+export type GroupConfig = Record<string, unknown> & {
+  name: string
+  type: string
+  proxies?: string[]
+  use?: string[]
+}
+
+export type GroupDetail = {
+  id: string
+  config: GroupConfig
+  modified: boolean
+  custom: boolean
+  references: string[]
+}
+
 export type F50State = {
   version: string
   revision: number
@@ -53,6 +68,8 @@ export type F50State = {
   routes: RouteRule[]
   nodes: NodeEntry[]
   groups: string[]
+  groupDetails: GroupDetail[]
+  providerNames: string[]
   disabled: string[]
   dns: Record<string, unknown>
   advanced: Record<string, unknown>

@@ -56,22 +56,40 @@ type Route struct {
 	NoResolve bool   `json:"noResolve"`
 }
 
+type GroupEdit struct {
+	ID          string   `json:"id"`
+	Original    string   `json:"original,omitempty"`
+	Config      Object   `json:"config,omitempty"`
+	Aliases     []string `json:"aliases,omitempty"`
+	Deleted     bool     `json:"deleted,omitempty"`
+	Replacement string   `json:"replacement,omitempty"`
+}
+
+type GroupView struct {
+	ID         string   `json:"id"`
+	Config     Object   `json:"config"`
+	Modified   bool     `json:"modified"`
+	Custom     bool     `json:"custom"`
+	References []string `json:"references"`
+}
+
 type State struct {
-	Revision   int64        `json:"revision"`
-	Mode       string       `json:"mode"`
-	Active     string       `json:"active"`
-	Base       string       `json:"base"`
-	Pins       Object       `json:"pins"`
-	DNSListen  any          `json:"dnsListen,omitempty"`
-	Sources    []Source     `json:"sources"`
-	Manual     []ManualNode `json:"manual"`
-	Chains     []Chain      `json:"chains"`
-	Routes     []Route      `json:"routes"`
-	Disabled   []string     `json:"disabled"`
-	DNS        Object       `json:"dns"`
-	Advanced   Object       `json:"advanced"`
-	Resources  Object       `json:"resources"`
-	ConfigHash string       `json:"configHash"`
+	Revision   int64                  `json:"revision"`
+	Mode       string                 `json:"mode"`
+	Active     string                 `json:"active"`
+	Base       string                 `json:"base"`
+	Pins       Object                 `json:"pins"`
+	DNSListen  any                    `json:"dnsListen,omitempty"`
+	Sources    []Source               `json:"sources"`
+	Manual     []ManualNode           `json:"manual"`
+	Chains     []Chain                `json:"chains"`
+	Routes     []Route                `json:"routes"`
+	Disabled   []string               `json:"disabled"`
+	DNS        Object                 `json:"dns"`
+	Advanced   Object                 `json:"advanced"`
+	Resources  Object                 `json:"resources"`
+	ConfigHash string                 `json:"configHash"`
+	GroupEdits map[string][]GroupEdit `json:"groupEdits,omitempty"`
 }
 
 type Action struct {
@@ -90,6 +108,8 @@ type Action struct {
 	Names         []string `json:"names"`
 	Rules         []Route  `json:"rules"`
 	Values        Object   `json:"values"`
+	Group         Object   `json:"group"`
+	Replacement   string   `json:"replacement"`
 }
 
 func newID() string {

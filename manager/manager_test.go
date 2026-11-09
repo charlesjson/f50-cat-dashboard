@@ -290,7 +290,7 @@ func TestAPIRequiresLANOriginAndBearerHeader(t *testing.T) {
 
 func TestInterruptedTransactionRecoversBeforeServing(t *testing.T) {
 	a := testApp(t)
-	old := snapshot{a.state, testConfig}
+	old := snapshot{State: a.state, Config: testConfig}
 	_ = atomicWrite(filepath.Join(a.options.Root, "pending.json"), jsonBytes(old), 0600)
 	_ = atomicWrite(a.options.Config, []byte("broken config"), 0600)
 	called := false

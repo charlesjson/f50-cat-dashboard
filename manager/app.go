@@ -30,8 +30,9 @@ type App struct {
 }
 
 type snapshot struct {
-	State  State  `json:"state"`
-	Config string `json:"config"`
+	State      State             `json:"state"`
+	Config     string            `json:"config"`
+	Selections map[string]string `json:"selections,omitempty"`
 }
 
 func openApp(o Options) (*App, error) {
@@ -43,6 +44,7 @@ func openApp(o Options) (*App, error) {
 	// Recover a write interrupted between the runtime config and state commits.
 	pendingPath := filepath.Join(o.Root, "pending.json")
 	recovered := false
+	var recoveredSelections map[string]string
 	if pending, err := os.ReadFile(pendingPath); err == nil {
 		var old snapshot
 		if err := json.Unmarshal(pending, &old); err != nil {
@@ -55,6 +57,7 @@ func openApp(o Options) (*App, error) {
 			return nil, err
 		}
 		recovered = true
+		recoveredSelections = old.Selections
 	}
 	current, err := os.ReadFile(o.Config)
 	if err != nil {
@@ -96,6 +99,9 @@ func openApp(o Options) (*App, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
 		defer cancel()
 		if err := a.reload(ctx); err != nil {
+			return nil, err
+		}
+		if err := a.restoreGroupSelections(ctx, recoveredSelections, nil); err != nil {
 			return nil, err
 		}
 		if err := os.Remove(pendingPath); err != nil {
@@ -237,11 +243,15 @@ func (a *App) commit(ctx context.Context, next State) error {
 	if err := a.validate(ctx, data); err != nil {
 		return err
 	}
+	selections, err := a.captureGroupSelections(ctx, next)
+	if err != nil {
+		return err
+	}
 	current, err := os.ReadFile(a.options.Config)
 	if err != nil {
 		return err
 	}
-	old := snapshot{a.state, string(current)}
+	old := snapshot{State: a.state, Config: string(current), Selections: selections}
 	if _, err := a.backup(old); err != nil {
 		return err
 	}
@@ -258,7 +268,8 @@ func (a *App) commit(ctx context.Context, next State) error {
 		recoverCtx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
 		defer cancel()
 		reloadErr := a.reload(recoverCtx)
-		if configErr != nil || hashErr != nil || stateErr != nil || reloadErr != nil {
+		selectionErr := a.restoreGroupSelections(recoverCtx, selections, nil)
+		if configErr != nil || hashErr != nil || stateErr != nil || reloadErr != nil || selectionErr != nil {
 			return fmt.Errorf("应用失败，恢复未完成；已保留事务和备份文件: %w", cause)
 		}
 		_ = os.Remove(pendingPath)
@@ -271,6 +282,9 @@ func (a *App) commit(ctx context.Context, next State) error {
 		return rollback(err)
 	}
 	if err := a.reload(ctx); err != nil {
+		return rollback(err)
+	}
+	if err := a.restoreGroupSelections(ctx, selections, &next); err != nil {
 		return rollback(err)
 	}
 	if err := a.saveState(next); err != nil {
@@ -304,6 +318,10 @@ func (a *App) mutate(ctx context.Context, action Action) error {
 		return -1
 	}
 	switch action.Op {
+	case "save-group", "delete-group":
+		if err := updateGroup(&next, action); err != nil {
+			return err
+		}
 	case "save-source":
 		if action.Mode != "pool" && action.Mode != "full" || strings.TrimSpace(action.Name) == "" || strings.ContainsAny(action.Name, ",\r\n") || len(action.Name) > 100 {
 			return errors.New("请填写合法订阅名称和导入方式")
@@ -372,6 +390,7 @@ func (a *App) mutate(ctx context.Context, action Action) error {
 				return errors.New("请先切换完整配置，再删除当前配置")
 			}
 			next.Sources = append(next.Sources[:i], next.Sources[i+1:]...)
+			delete(next.GroupEdits, action.ID)
 		}
 	case "activate":
 		next.Active, next.Disabled = action.ID, nil
@@ -500,7 +519,7 @@ func (a *App) mutate(ctx context.Context, action Action) error {
 			}
 		}
 		next.DNSListen = objectOf(cfg["dns"])["listen"]
-		if _, err := a.backup(snapshot{a.state, string(data)}); err != nil {
+		if _, err := a.backup(snapshot{State: a.state, Config: string(data)}); err != nil {
 			return err
 		}
 		if err := a.saveState(next); err != nil {

@@ -25,19 +25,7 @@ type NodeView struct {
 }
 
 func compile(s State) ([]byte, []NodeView, error) {
-	base := s.Base
-	if s.Active != "current" {
-		found := false
-		for _, source := range s.Sources {
-			if source.ID == s.Active && source.Mode == "full" {
-				base, found = source.Config, true
-			}
-		}
-		if !found {
-			return nil, nil, errors.New("找不到已选完整配置")
-		}
-	}
-	cfg, err := parseYAML(base)
+	cfg, err := activeConfig(s)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -149,6 +137,7 @@ func compile(s State) ([]byte, []NodeView, error) {
 	}
 	cfg["proxies"] = nodes
 	groups := objects(cfg["proxy-groups"])
+	resolveGroup := groupResolver(func(name string) (string, error) { return name, nil })
 	if s.Mode == "simple" {
 		var names []string
 		for _, node := range nodes {
@@ -159,6 +148,11 @@ func compile(s State) ([]byte, []NodeView, error) {
 		delete(cfg, "proxy-providers")
 		delete(cfg, "rule-providers")
 	} else {
+		var modified map[string]bool
+		groups, resolveGroup, modified, err = applyGroupEdits(cfg, s)
+		if err != nil {
+			return nil, nil, err
+		}
 		for _, group := range groups {
 			var names []string
 			for _, name := range stringsOf(group["proxies"]) {
@@ -176,12 +170,14 @@ func compile(s State) ([]byte, []NodeView, error) {
 		if len(additions) > 0 {
 			for _, group := range groups {
 				if group["type"] == "select" {
-					group["proxies"] = append(stringsOf(group["proxies"]), additions...)
+					if !modified[stringOf(group["name"])] {
+						group["proxies"] = append(stringsOf(group["proxies"]), additions...)
+					}
 					break
 				}
 			}
 		}
-		if len(groups) == 0 && len(nodes) > 0 {
+		if len(groups) == 0 && len(nodes) > 0 && len(s.GroupEdits[s.Active]) == 0 {
 			var names []string
 			for _, node := range nodes {
 				names = append(names, stringOf(node["name"]))
@@ -191,19 +187,27 @@ func compile(s State) ([]byte, []NodeView, error) {
 		}
 	}
 	cfg["proxy-groups"] = groups
+	if err := validateGroupGraph(cfg, groups); err != nil {
+		return nil, nil, err
+	}
 	targets := map[string]bool{"DIRECT": true, "REJECT": true, "REJECT-DROP": true, "PASS": true, "COMPATIBLE": true}
 	for _, node := range nodes {
 		targets[stringOf(node["name"])] = true
 	}
 	for _, group := range groups {
 		name := stringOf(group["name"])
-		if targets[name] {
+		if targets[name] || all[name] {
 			return nil, nil, fmt.Errorf("策略组名称重复: %s", name)
 		}
 		targets[name] = true
 	}
 	var rules []string
 	for _, route := range s.Routes {
+		target, err := resolveGroup(route.Target)
+		if err != nil {
+			return nil, nil, err
+		}
+		route.Target = target
 		if err := validateRoute(route, targets); err != nil {
 			return nil, nil, err
 		}
@@ -251,6 +255,11 @@ func compile(s State) ([]byte, []NodeView, error) {
 	}
 	// Dashboard updates must use this project's release, not replace management UI.
 	cfg["external-ui-url"] = "https://github.com/charlesjson/f50-cat-dashboard/releases/latest/download/dist.zip"
+	if s.Mode == "full" {
+		if err := mapGroupReferences(cfg, groups, resolveGroup); err != nil {
+			return nil, nil, err
+		}
+	}
 	data, err := marshalYAML(cfg)
 	return data, views, err
 }

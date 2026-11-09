@@ -18,12 +18,15 @@ import {
   type Source,
 } from '@/assembly/f50'
 import { fetchProxies } from '@/assembly/proxies'
+import { fetchRules } from '@/assembly/rules'
+import GroupManager from '@/components/f50/GroupManager.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 
-type Tab = 'nodes' | 'routes' | 'dns' | 'advanced' | 'resources' | 'preview'
+type Tab = 'nodes' | 'groups' | 'routes' | 'dns' | 'advanced' | 'resources' | 'preview'
 type Editor = 'source' | 'manual' | 'chain' | 'base' | null
 const tabs: { id: Tab; label: string }[] = [
   { id: 'nodes', label: '节点' },
+  { id: 'groups', label: '策略组' },
   { id: 'routes', label: '路由' },
   { id: 'dns', label: 'DNS 配置' },
   { id: 'advanced', label: '高级' },
@@ -156,7 +159,7 @@ async function run(action: Record<string, unknown>, closeEditor = false) {
     await applyF50Action(state.value.revision, action)
     if (closeEditor) editor.value = null
     await load()
-    await Promise.allSettled([fetchConfigs(), fetchProxies()])
+    await Promise.allSettled([fetchConfigs(), fetchProxies(), fetchRules()])
     notice('已保存并应用到设备')
     if (tab.value === 'advanced') await loadBackups()
     return true
@@ -445,6 +448,14 @@ onMounted(refresh)
         :disabled="busy"
         class="f50-fieldset"
       >
+        <GroupManager
+          v-if="tab === 'groups'"
+          :state="state"
+          :busy="busy"
+          :error="failed ? message : ''"
+          :apply="run"
+          @clear-error="notice('')"
+        />
         <template v-if="tab === 'nodes'">
           <div class="f50-grid">
             <section class="f50-card">
