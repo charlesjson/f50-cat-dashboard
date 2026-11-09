@@ -1,6 +1,6 @@
 {
   "name": "f50-cat-dashboard",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "zashboard with persistent F50 subscription, node and routing management",
   "license": "MIT",
   "type": "module",

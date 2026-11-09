@@ -179,6 +179,7 @@ async function coreAction(action: () => Promise<unknown>, success: string) {
   }
 }
 function resetForm() {
+  notice('')
   Object.assign(form, {
     id: '',
     name: '',
